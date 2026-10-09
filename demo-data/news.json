@@ -1,0 +1,74 @@
+[
+  {
+    "id": 1,
+    "title": "RBI Keeps Repo Rate Steady Amid Robust Indian GDP Growth Forecasts",
+    "source": "Business Standard RSS",
+    "published_at": "2026-10-01T14:30:00",
+    "url": "https://www.business-standard.com/economy/news",
+    "related_stock": "HDFCBANK",
+    "category": "Economy & Banking",
+    "sentiment": "Positive",
+    "sentiment_score": 0.72,
+    "summary": "Monetary policy committee maintains benchmark interest rate as domestic demand and manufacturing indicators show strong momentum."
+  },
+  {
+    "id": 2,
+    "title": "Reliance Industries Announces Major Solar & Green Hydrogen Capacity Expansion in Jamnagar",
+    "source": "LiveMint RSS",
+    "published_at": "2026-10-01T12:15:00",
+    "url": "https://www.livemint.com/companies/news",
+    "related_stock": "RELIANCE",
+    "category": "Corporate & Energy",
+    "sentiment": "Positive",
+    "sentiment_score": 0.85,
+    "summary": "RIL green energy giga-factory complex nears phase-1 commissioning with planned electrolyzer and solar cell manufacturing."
+  },
+  {
+    "id": 3,
+    "title": "TCS Secures Multi-Million Dollar European Digital Banking Transformation Deal",
+    "source": "Economic Times RSS",
+    "published_at": "2026-10-01T11:00:00",
+    "url": "https://economictimes.indiatimes.com/tech",
+    "related_stock": "TCS",
+    "category": "Information Technology",
+    "sentiment": "Positive",
+    "sentiment_score": 0.68,
+    "summary": "India's largest IT exporter signs multi-year cloud modernization agreement with top Nordic financial services group."
+  },
+  {
+    "id": 4,
+    "title": "Indian Auto Retail Sales Witness Slight Festive Pre-Season Moderation",
+    "source": "Reuters India",
+    "published_at": "2026-10-01T09:45:00",
+    "url": "https://in.reuters.com/markets",
+    "related_stock": "TATAMOTORS",
+    "category": "Automobile",
+    "sentiment": "Neutral",
+    "sentiment_score": -0.05,
+    "summary": "Dealers note inventory accumulation in passenger vehicle segment while commercial vehicle volumes remain resilient."
+  },
+  {
+    "id": 5,
+    "title": "SEBI Releases Enhanced Framework for SME IPO Due Diligence and Allocation Transparency",
+    "source": "NSE Public Circulars",
+    "published_at": "2026-10-01T08:20:00",
+    "url": "https://www.nseindia.com/resources/circulars",
+    "related_stock": "",
+    "category": "IPO Regulations",
+    "sentiment": "Neutral",
+    "sentiment_score": 0.15,
+    "summary": "Markets regulator increases monitoring of financial disclosures, minimum application sizes, and promoter lock-in requirements for SME exchanges."
+  },
+  {
+    "id": 6,
+    "title": "Infosys Expands Enterprise Generative AI Portfolio Topaz Across Global Clients",
+    "source": "BusinessLine",
+    "published_at": "2026-09-30T16:40:00",
+    "url": "https://www.thehindubusinessline.com/info-tech",
+    "related_stock": "INFY",
+    "category": "Information Technology",
+    "sentiment": "Positive",
+    "sentiment_score": 0.64,
+    "summary": "Accelerating enterprise AI adoption drives incremental deal pipeline in financial services and life sciences."
+  }
+]
