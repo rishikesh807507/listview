@@ -257,7 +257,7 @@ export const Dashboard: React.FC = () => {
               </div>
               <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-lg">
                 <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">52W Highs/Lows</span>
-                <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{stats.highs_52w} / {stats.lows_52w}</span>
+                <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{(stats.highs_52w ?? 0)} / {(stats.lows_52w ?? 0)}</span>
               </div>
             </div>
           </div>

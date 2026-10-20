@@ -78,8 +78,100 @@ class MarketDataService:
         top_losers = [item for item in reversed(sorted_by_change) if item["change_percent"] < 0][:5]
         most_active = sorted(session_quotes, key=lambda x: x["volume"], reverse=True)[:5]
 
+        # Dynamically supplement Top Gainers from Stock table if insufficient from live feeds
+        if len(top_gainers) < 5:
+            existing_symbols = {g["symbol"] for g in top_gainers}
+            db_gainers = db.query(Stock).filter(
+                Stock.is_active == True,
+                Stock.current_price.isnot(None),
+                Stock.current_price > 0,
+                Stock.change_percent.isnot(None),
+                Stock.change_percent > 0,
+                ~Stock.symbol.in_(existing_symbols)
+            ).order_by(Stock.change_percent.desc()).limit(5 - len(top_gainers)).all()
+            for s in db_gainers:
+                ts_str = s.updated_at.strftime("%d %b %Y, %I:%M %p IST") if s.updated_at else common_session_timestamp
+                top_gainers.append({
+                    "symbol": s.symbol,
+                    "name": s.name,
+                    "price": s.current_price,
+                    "change": s.change or 0.0,
+                    "change_percent": s.change_percent,
+                    "volume": s.volume or 0.0,
+                    "as_of": ts_str
+                })
+
+        # Dynamically supplement Top Losers from Stock table if insufficient from live feeds
+        if len(top_losers) < 5:
+            existing_symbols = {l["symbol"] for l in top_losers}
+            db_losers = db.query(Stock).filter(
+                Stock.is_active == True,
+                Stock.current_price.isnot(None),
+                Stock.current_price > 0,
+                Stock.change_percent.isnot(None),
+                Stock.change_percent < 0,
+                ~Stock.symbol.in_(existing_symbols)
+            ).order_by(Stock.change_percent.asc()).limit(5 - len(top_losers)).all()
+            for s in db_losers:
+                ts_str = s.updated_at.strftime("%d %b %Y, %I:%M %p IST") if s.updated_at else common_session_timestamp
+                top_losers.append({
+                    "symbol": s.symbol,
+                    "name": s.name,
+                    "price": s.current_price,
+                    "change": s.change or 0.0,
+                    "change_percent": s.change_percent,
+                    "volume": s.volume or 0.0,
+                    "as_of": ts_str
+                })
+
+        # Dynamically supplement Most Active from Stock table if insufficient
+        if len(most_active) < 5:
+            existing_symbols = {a["symbol"] for a in most_active}
+            db_active = db.query(Stock).filter(
+                Stock.is_active == True,
+                Stock.current_price.isnot(None),
+                Stock.current_price > 0,
+                ~Stock.symbol.in_(existing_symbols)
+            ).order_by(Stock.volume.desc().nullslast()).limit(5 - len(most_active)).all()
+            for s in db_active:
+                ts_str = s.updated_at.strftime("%d %b %Y, %I:%M %p IST") if s.updated_at else common_session_timestamp
+                most_active.append({
+                    "symbol": s.symbol,
+                    "name": s.name,
+                    "price": s.current_price,
+                    "change": s.change or 0.0,
+                    "change_percent": s.change_percent or 0.0,
+                    "volume": s.volume or 0.0,
+                    "as_of": ts_str
+                })
+
+        # Calculate comprehensive market stats from database if live quotes are unavailable
+        if advances == 0 and declines == 0:
+            advances = db.query(Stock).filter(Stock.is_active == True, Stock.current_price > 0, Stock.change_percent > 0).count()
+            declines = db.query(Stock).filter(Stock.is_active == True, Stock.current_price > 0, Stock.change_percent < 0).count()
+            unchanged = db.query(Stock).filter(Stock.is_active == True, Stock.current_price > 0, Stock.change_percent == 0).count()
+
+        highs_52w = db.query(Stock).filter(
+            Stock.is_active == True,
+            Stock.current_price.isnot(None),
+            Stock.high_52w.isnot(None),
+            Stock.high_52w > 0,
+            Stock.current_price >= Stock.high_52w * 0.99
+        ).count()
+
+        lows_52w = db.query(Stock).filter(
+            Stock.is_active == True,
+            Stock.current_price.isnot(None),
+            Stock.low_52w.isnot(None),
+            Stock.low_52w > 0,
+            Stock.current_price <= Stock.low_52w * 1.01
+        ).count()
+
+        total_tracked = advances + declines + unchanged if (advances or declines) else len(session_quotes)
+        ad_ratio = round(advances / max(1, declines), 2) if declines > 0 else (round(float(advances), 2) if advances > 0 else 1.0)
+
         # Overall status based on session and data availability
-        overall_status = "Live" if session_info["is_open"] else "Market Closed"
+        overall_status = "Live" if session_info.get("is_open") else "Market Closed"
 
         return {
             "indices": indices_list,
@@ -90,8 +182,10 @@ class MarketDataService:
                 "advances": advances,
                 "declines": declines,
                 "unchanged": unchanged,
-                "total_tracked": len(session_quotes),
-                "advance_decline_ratio": round(advances / max(1, declines), 2)
+                "total_tracked": total_tracked,
+                "advance_decline_ratio": ad_ratio,
+                "highs_52w": highs_52w,
+                "lows_52w": lows_52w
             },
             "market_session": session_info,
             "as_of_timestamp": common_session_timestamp,

@@ -11,7 +11,7 @@ from pathlib import Path
 from backend.database import Base, engine, SessionLocal
 from backend.models import (
     Stock, StockPrice, StockFundamentals, FinancialStatement,
-    IPO, IPOSubscription, IPOGMP, News
+    IPO, IPOSubscription, IPOGMP, News, IndexQuote, MarketQuote
 )
 
 DEMO_DIR = Path(__file__).resolve().parent / "demo-data"
@@ -253,6 +253,53 @@ def seed():
                         db.add(news_obj)
                 db.commit()
             print("[+] Seeded Market News.")
+        
+        # 9. Benchmark Indices
+        existing_indices = db.query(IndexQuote).count()
+        if existing_indices == 0:
+            indices_data = [
+                {"index_name": "NIFTY 50", "value": 22888.95, "previous_close": 22721.95, "change": 167.0, "change_percent": 0.73, "source": "NSE Public Feed"},
+                {"index_name": "SENSEX", "value": 73852.9, "previous_close": 73033.78, "change": 819.12, "change_percent": 1.12, "source": "BSE Public Feed"},
+                {"index_name": "NIFTY BANK", "value": 55488.1, "previous_close": 55481.05, "change": 7.05, "change_percent": 0.01, "source": "NSE Public Feed"},
+                {"index_name": "NIFTY IT", "value": 31516.3, "previous_close": 29830.1, "change": 1686.2, "change_percent": 5.65, "source": "NSE Public Feed"},
+                {"index_name": "NIFTY AUTO", "value": 25591.25, "previous_close": 25576.4, "change": 14.85, "change_percent": 0.06, "source": "NSE Public Feed"},
+            ]
+            for idx in indices_data:
+                db.add(IndexQuote(
+                    index_name=idx["index_name"],
+                    value=idx["value"],
+                    previous_close=idx["previous_close"],
+                    change=idx["change"],
+                    change_percent=idx["change_percent"],
+                    timestamp=datetime(2026, 10, 19, 15, 30, 0),
+                    source=idx["source"],
+                    status="Verified",
+                    created_at=datetime.utcnow()
+                ))
+            db.commit()
+            print("[+] Seeded Benchmark Indices.")
+
+        # 10. Initial Market Quotes from Stocks
+        existing_quotes = db.query(MarketQuote).count()
+        if existing_quotes == 0:
+            active_stocks = db.query(Stock).filter(Stock.is_active == True, Stock.current_price > 0).limit(30).all()
+            for s in active_stocks:
+                db.add(MarketQuote(
+                    symbol=s.symbol,
+                    exchange=s.exchange or "NSE",
+                    instrument_type="EQUITY",
+                    price=s.current_price,
+                    previous_close=round(s.current_price - (s.change or 0.0), 2),
+                    change=s.change or 0.0,
+                    change_percent=s.change_percent or 0.0,
+                    volume=s.volume or 0.0,
+                    timestamp=datetime(2026, 10, 19, 15, 30, 0),
+                    source="NSE Securities Master",
+                    status="Verified",
+                    created_at=datetime.utcnow()
+                ))
+            db.commit()
+            print("[+] Seeded Initial Market Quotes.")
 
         print("\n[SUCCESS] Database seeded successfully with zero paid APIs!")
     finally:

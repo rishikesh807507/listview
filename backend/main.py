@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 
 from backend.config import settings
 from backend.database import engine, Base, SessionLocal
-from backend.models import Stock
+from backend.models import Stock, IndexQuote
 from seed_database import seed as seed_db
 
 # Import routers
@@ -39,8 +39,9 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         count = db.query(Stock).count()
-        if count == 0:
-            logger.info("Fresh database detected; initializing baseline dataset...")
+        idx_count = db.query(IndexQuote).count()
+        if count == 0 or idx_count == 0:
+            logger.info("Fresh database or missing index dataset detected; initializing baseline dataset...")
             try:
                 seed_db()
             except Exception as e:
