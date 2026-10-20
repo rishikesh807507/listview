@@ -55,6 +55,8 @@ def refresh_securities_master(db: Session) -> dict:
     inserted = 0
     updated = 0
 
+    all_existing = {s.symbol: s for s in db.query(Stock).all()}
+
     for row in reader:
         if not row or len(row) < 7:
             continue
@@ -66,7 +68,7 @@ def refresh_securities_master(db: Session) -> dict:
         if series not in ("EQ", "BE", "BZ", "SM"):
             continue
 
-        existing = db.query(Stock).filter(Stock.symbol == symbol).first()
+        existing = all_existing.get(symbol)
         if existing:
             existing.name = company_name
             existing.isin = isin
