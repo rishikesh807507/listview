@@ -9,11 +9,25 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4+-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![Live API](https://img.shields.io/badge/Live_Demo-Swagger_UI-46E3B7?style=flat-square&logo=render&logoColor=white)](https://listview.onrender.com/docs)
+[![API Status](https://img.shields.io/badge/API_Status-Online-brightgreen?style=flat-square)](https://listview.onrender.com/api/health)
+
+---
+
+## 🔗 Live Demo & Production Endpoints
+
+| Resource | Link | Description |
+| :--- | :--- | :--- |
+| **Interactive Swagger API Docs** | [https://listview.onrender.com/docs](https://listview.onrender.com/docs) | Interactive API explorer & live schema documentation |
+| **Market Overview Feed** | [https://listview.onrender.com/api/market/overview](https://listview.onrender.com/api/market/overview) | Verified benchmark indices, session state, and Top Gainers/Losers |
+| **Synchronization Engine Status** | [https://listview.onrender.com/api/sync/status](https://listview.onrender.com/api/sync/status) | Live sync status across 2,600+ equities, 36 IPOs, and 5 indices |
+| **Platform Health Verification** | [https://listview.onrender.com/api/health](https://listview.onrender.com/api/health) | Zero-cost platform health & uptime verification |
 
 ---
 
 ## 📑 Table of Contents
 
+- [Live Demo & Production Endpoints](#-live-demo--production-endpoints)
 - [Overview & Core Value](#-overview--core-value)
 - [Key Features](#-key-features)
 - [Architecture & Data Flow](#-architecture--data-flow)
