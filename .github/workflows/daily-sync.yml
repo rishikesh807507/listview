@@ -1,0 +1,24 @@
+name: Daily Market Data Synchronization
+
+on:
+  schedule:
+    # Run at 13:00 UTC (18:30 IST) every Monday through Friday after Indian markets close
+    - cron: '0 13 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping and Synchronize Listview API
+        env:
+          BACKEND_URL: ${{ secrets.LISTVIEW_BACKEND_URL }}
+        run: |
+          if [ -z "$BACKEND_URL" ]; then
+            echo "LISTVIEW_BACKEND_URL secret not set. Skipping remote sync invocation."
+            exit 0
+          fi
+          echo "Pinging health endpoint to ensure backend is awake..."
+          curl -s -f "$BACKEND_URL/api/health" || echo "Health ping completed"
+          echo "Triggering background data sync..."
+          curl -s -X POST "$BACKEND_URL/api/sync/run" || echo "Sync endpoint triggered"

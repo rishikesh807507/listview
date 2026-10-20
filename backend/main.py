@@ -39,6 +39,14 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         count = db.query(Stock).count()
+        if count == 0:
+            logger.info("Fresh database detected; initializing baseline dataset...")
+            try:
+                seed_db()
+            except Exception as e:
+                logger.warning(f"Initial baseline seeding error: {e}")
+            count = db.query(Stock).count()
+
         if count < 50:
             logger.info("Initializing securities master from official exchange dataset...")
             from backend.data.securities_master import refresh_securities_master

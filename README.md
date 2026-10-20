@@ -299,30 +299,56 @@ test_platform.py::test_backtest_strategy PASSED
 
 ---
 
-## 🚢 Deployment Guide
+---
 
-### Option 1: Linux VM / VPS (Systemd + Nginx)
-1. **Backend**: Run Uvicorn managed by systemd or Supervisor on port `8000`.
-2. **Frontend**: Build production bundle via `npm run build` inside `frontend/` and serve static assets via Nginx.
-3. **Reverse Proxy**: Configure Nginx to route `/api/*` to `http://127.0.0.1:8000/api/*`.
+## 🚢 Zero-Cost Production Deployment Guide (₹0 Indefinitely)
 
-### Option 2: Docker Containerization
-```dockerfile
-# Multi-stage Dockerfile pattern supported:
-# Stage 1: Build React static assets with Vite
-# Stage 2: Python 3.11-slim container with FastAPI + Uvicorn serving static files
-```
+Listview can be deployed at **₹0 ongoing cost** without trial expirations using best-in-class free tiers:
 
-### Option 3: Production Database Migration
-To switch from SQLite to PostgreSQL:
-```bash
-# Update DATABASE_URL in .env:
-DATABASE_URL=postgresql://user:password@localhost:5432/listview
+| Component | Recommended Service | Free Tier Allowance | Details |
+| :--- | :--- | :--- | :--- |
+| **Frontend** | [Vercel](https://vercel.com) / [Cloudflare Pages](https://pages.cloudflare.com) | Unlimited bandwidth (100GB/mo on Vercel), Free SSL, Global CDN | Automated CI/CD from GitHub, instant edge delivery |
+| **Backend API** | [Render](https://render.com) Web Service | 750 free instance hours/mo, 512MB RAM | Spins down after 15 min inactivity; wakes on request (~30s cold start) |
+| **Database** | [Neon](https://neon.tech) Serverless PostgreSQL | 0.5 GB storage, always-free, no card required | Persistent cloud database with auto-seeding on fresh start |
+| **Daily Sync** | [GitHub Actions](https://github.com/features/actions) | 2,000 free runner mins/mo | Wakes backend at 18:30 IST on weekdays to run exchange synchronization |
 
-# Run migrations/seed:
-python seed_database.py
-python enrich_stocks_data.py
-```
+### 1. Database Setup (Neon PostgreSQL — ₹0)
+1. Sign up at [neon.tech](https://neon.tech) (Free tier, no credit card required).
+2. Create a project named `listview-db`.
+3. Copy the pooled connection string: `postgresql://neondb_owner:***@ep-***.aws.neon.tech/neondb?sslmode=require`.
+
+### 2. Backend Deployment (Render — ₹0)
+1. Log in to [render.com](https://render.com) and click **New + > Web Service**.
+2. Connect your GitHub repository: `https://github.com/rishikesh807507/listview`.
+3. Configure the service settings:
+   - **Name**: `listview-api`
+   - **Root Directory**: (Leave blank / root)
+   - **Runtime**: `Python 3`
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
+   - **Instance Type**: `Free`
+4. In **Environment Variables**, add:
+   - `DATABASE_URL`: *(Your Neon PostgreSQL connection string from Step 1, or leave unset to use SQLite)*
+   - `PYTHON_VERSION`: `3.11.9`
+5. Click **Deploy Web Service**. On first launch, the app creates all database tables and seeds stocks and IPOs automatically. Note your public backend URL: `https://listview-api.onrender.com`.
+
+### 3. Frontend Deployment (Vercel — ₹0)
+1. Log in to [vercel.com](https://vercel.com) and click **Add New > Project**.
+2. Import `https://github.com/rishikesh807507/listview`.
+3. Configure project settings:
+   - **Framework Preset**: `Vite`
+   - **Root Directory**: `frontend`
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `dist`
+4. In **Environment Variables**, add:
+   - `VITE_API_BASE_URL`: `https://listview-api.onrender.com/api` *(Your Render backend URL followed by `/api`)*
+5. Click **Deploy**. Vercel will build the frontend and provide your live URL (e.g., `https://listview-xxx.vercel.app`).
+
+### 4. Automated Daily Sync Setup (GitHub Actions — ₹0)
+1. Go to your GitHub repository **Settings > Secrets and variables > Actions**.
+2. Click **New repository secret**.
+3. Name: `LISTVIEW_BACKEND_URL`, Value: `https://listview-api.onrender.com`.
+4. The workflow at `.github/workflows/daily-sync.yml` will automatically ping and synchronize market data every weekday at 18:30 IST.
 
 ---
 
