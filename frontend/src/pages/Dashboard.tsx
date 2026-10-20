@@ -103,10 +103,15 @@ export const Dashboard: React.FC = () => {
               return (
                 <div key={indexName} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-xs flex flex-col justify-between">
                   <div>
-                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">{indexName}</span>
-                    <span className="text-xs text-rose-500 font-medium mt-2 block">Live data unavailable</span>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block truncate">{indexName}</span>
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400">
+                        Unavailable
+                      </span>
+                    </div>
+                    <span className="text-xs text-rose-500 font-medium mt-2 block">Live feed & cache unavailable</span>
                   </div>
-                  <div className="text-[10px] text-slate-400 mt-2">Source: {idx.source || 'NSE'}</div>
+                  <div className="text-[10px] text-slate-400 mt-2 truncate">{idx.warning || 'Awaiting upstream update'}</div>
                 </div>
               );
             }
@@ -117,7 +122,9 @@ export const Dashboard: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block truncate">{indexName}</span>
                     <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                      idx.status === 'Verified' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                      idx.status === 'Verified' || idx.status === 'Live' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300' :
+                      idx.status === 'Stale Cached' || idx.status === 'Delayed' ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300' :
+                      'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                     }`}>
                       {idx.status || 'Verified'}
                     </span>
@@ -135,7 +142,10 @@ export const Dashboard: React.FC = () => {
 
                 <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-400 space-y-0.5">
                   <div className="truncate"><span className="text-slate-500 dark:text-slate-400 font-medium">Source:</span> {idx.source || 'NSE Public Feed'}</div>
-                  <div className="truncate"><span className="text-slate-500 dark:text-slate-400 font-medium">Updated:</span> {idx.timestamp}</div>
+                  <div className="truncate"><span className="text-slate-500 dark:text-slate-400 font-medium">Observed:</span> {idx.timestamp}</div>
+                  {idx.warning && (
+                    <div className="text-[10px] text-amber-600 dark:text-amber-400 truncate">{idx.warning}</div>
+                  )}
                 </div>
               </div>
             );

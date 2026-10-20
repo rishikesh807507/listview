@@ -135,7 +135,19 @@ def evaluate_freshness(timestamp) -> dict:
     age_seconds = (now_ist - ts_ist).total_seconds()
     session_info = get_market_session(now_ist)
 
-    # If the market is closed, we cannot label data as "LIVE"
+    # 1. Stale check: if older than 2 days (weekend threshold), it is always stale
+    if age_seconds > 172800:
+        days = round(age_seconds / 86400, 1)
+        return {
+            "freshness": "Stale",
+            "age_seconds": int(age_seconds),
+            "formatted_time": ts_ist.strftime("%d %b %Y, %I:%M %p IST"),
+            "badge_color": "red",
+            "is_live": False,
+            "warning": f"⚠️ Stale snapshot (Last verified {days} days ago)"
+        }
+
+    # 2. If the market is closed, we cannot label data as "LIVE"
     if not session_info["is_open"]:
         return {
             "freshness": "Market Closed",
@@ -143,9 +155,10 @@ def evaluate_freshness(timestamp) -> dict:
             "formatted_time": ts_ist.strftime("%d %b %Y, %I:%M %p IST"),
             "badge_color": "neutral",
             "is_live": False,
-            "warning": None
+            "warning": "Market closed. Displaying last verified closing snapshot."
         }
 
+    # 3. Regular trading session freshness thresholds
     if age_seconds < 120:  # < 2 min
         return {
             "freshness": "Live",

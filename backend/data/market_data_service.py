@@ -7,11 +7,12 @@ and strictly enforces that no fake or fabricated data reaches the UI.
 import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 from sqlalchemy.orm import Session
 
 from backend.data.provider_manager import provider_manager, diagnostics
 from backend.data.symbol_mapper import symbol_mapper, INDEX_REGISTRY
-from backend.data.market_session import get_market_session, get_ist_now
+from backend.data.market_session import get_market_session, get_ist_now, evaluate_freshness
 from backend.models import Stock
 
 logger = logging.getLogger("MarketDataService")
@@ -22,6 +23,7 @@ class MarketDataService:
     """
     def __init__(self):
         self.provider_mgr = provider_manager
+        self.provider_manager = provider_manager
 
     def get_market_overview(self, db: Session) -> Dict[str, Any]:
         """
@@ -30,41 +32,134 @@ class MarketDataService:
         """
         session_info = get_market_session()
 
-        # 1. Fetch official indices (Separate from normal stocks)
-        indices_list = []
-        for index_name in ["NIFTY 50", "SENSEX", "NIFTY BANK", "NIFTY IT", "NIFTY AUTO"]:
-            idx_data = self.provider_mgr.get_index_data(db, index_name)
-            indices_list.append(idx_data)
+        # 1. Fetch live index quotes concurrently across bounded thread pool
+        target_indices = ["NIFTY 50", "SENSEX", "NIFTY BANK", "NIFTY IT", "NIFTY AUTO"]
+        live_index_quotes = {}
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            future_to_idx = {executor.submit(self.provider_mgr.index_provider.get_index_quote, name): name for name in target_indices}
+            for future in future_to_idx:
+                name = future_to_idx[future]
+                try:
+                    live_index_quotes[name] = future.result(timeout=4.0)
+                except Exception as e:
+                    logger.debug(f"Live index fetch timeout/error for {name}: {e}")
+                    live_index_quotes[name] = None
 
-        # 2. Retrieve verified universe for Top Gainers / Losers (Section 14 & 15)
-        # Use verified registry of core large-cap Indian equities
+        # Process indices sequentially on the caller's db session
+        indices_list = []
+        for name in target_indices:
+            q = live_index_quotes.get(name)
+            if q:
+                self.provider_mgr.cache_manager.save_index_quote(db, q)
+                diagnostics.record_success()
+                freshness = evaluate_freshness(q["timestamp"])
+                indices_list.append({
+                    "index_name": q["index_name"],
+                    "value": q["price"],
+                    "price": q["price"],
+                    "previous_close": q["previous_close"],
+                    "change": q["change"],
+                    "change_percent": q["change_percent"],
+                    "timestamp": freshness["formatted_time"],
+                    "source": q["source"],
+                    "status": freshness["freshness"],
+                    "freshness": freshness["freshness"],
+                    "warning": freshness["warning"]
+                })
+            else:
+                diagnostics.record_failure(f"Failed live fetch for {name}")
+                cached = self.provider_mgr.cache_manager.get_last_verified_index(db, name)
+                if cached:
+                    indices_list.append({
+                        "index_name": cached["index_name"],
+                        "value": cached["value"],
+                        "price": cached.get("price", cached["value"]),
+                        "previous_close": cached["previous_close"],
+                        "change": cached["change"],
+                        "change_percent": cached["change_percent"],
+                        "timestamp": cached["last_verified"],
+                        "source": cached["source"],
+                        "status": cached.get("status", "Cached"),
+                        "freshness": cached.get("freshness", "Cached"),
+                        "warning": cached.get("warning")
+                    })
+                else:
+                    indices_list.append({
+                        "index_name": name,
+                        "value": None,
+                        "price": None,
+                        "previous_close": None,
+                        "change": None,
+                        "change_percent": None,
+                        "timestamp": get_ist_now().strftime("%d %b %Y, %I:%M %p IST"),
+                        "source": "None",
+                        "status": "Unavailable",
+                        "freshness": "Unavailable",
+                        "warning": f"Live data temporarily unavailable — no verified cache found for {name}"
+                    })
+
+        # 2. Retrieve verified universe for Top Gainers / Losers
         equity_symbols = symbol_mapper.get_all_equity_symbols()
+        live_equity_quotes = {}
+        with ThreadPoolExecutor(max_workers=6) as executor:
+            future_to_sym = {executor.submit(self.provider_mgr.stock_provider.get_quote, sym): sym for sym in equity_symbols}
+            for future in future_to_sym:
+                sym = future_to_sym[future]
+                try:
+                    live_equity_quotes[sym] = future.result(timeout=3.0)
+                except Exception as e:
+                    logger.debug(f"Live equity fetch timeout/error for {sym}: {e}")
+                    live_equity_quotes[sym] = None
+
         session_quotes = []
         common_session_timestamp = get_ist_now().strftime("%d %b %Y, %I:%M %p IST")
-
         advances = 0
         declines = 0
         unchanged = 0
 
         for sym in equity_symbols:
             meta = symbol_mapper.get_equity_meta(sym)
-            quote = self.provider_mgr.get_equity_data(db, sym)
-            
-            price = quote.get("current_price")
-            chg = quote.get("change")
-            chg_pct = quote.get("change_percent")
+            quote = live_equity_quotes.get(sym)
+            if quote:
+                self.provider_mgr.cache_manager.save_market_quote(db, quote)
+                diagnostics.record_success()
+                freshness = evaluate_freshness(quote["timestamp"])
+                eq_data = {
+                    "symbol": quote["symbol"],
+                    "price": quote["price"],
+                    "previous_close": quote["previous_close"],
+                    "change": quote["change"],
+                    "change_percent": quote["change_percent"],
+                    "volume": quote.get("volume", 0),
+                    "timestamp": freshness["formatted_time"]
+                }
+            else:
+                diagnostics.record_failure(f"Failed live fetch for {sym}")
+                cached = self.provider_mgr.cache_manager.get_last_verified_quote(db, sym)
+                if cached:
+                    eq_data = {
+                        "symbol": cached["symbol"],
+                        "price": cached.get("price"),
+                        "previous_close": cached.get("previous_close"),
+                        "change": cached.get("change"),
+                        "change_percent": cached.get("change_percent"),
+                        "volume": cached.get("volume", 0),
+                        "timestamp": cached.get("last_verified")
+                    }
+                else:
+                    eq_data = None
 
-            if price is not None and chg_pct is not None:
+            if eq_data and eq_data.get("price") is not None and eq_data.get("change_percent") is not None:
                 session_quotes.append({
                     "symbol": sym,
                     "name": meta["company_name"] if meta else sym,
-                    "price": price,
-                    "change": chg,
-                    "change_percent": chg_pct,
-                    "volume": quote.get("volume", 0),
-                    "as_of": quote.get("timestamp") or common_session_timestamp
+                    "price": eq_data["price"],
+                    "change": eq_data["change"],
+                    "change_percent": eq_data["change_percent"],
+                    "volume": eq_data.get("volume", 0),
+                    "as_of": eq_data.get("timestamp") or common_session_timestamp
                 })
-
+                chg = eq_data.get("change")
                 if chg is not None and chg > 0:
                     advances += 1
                 elif chg is not None and chg < 0:

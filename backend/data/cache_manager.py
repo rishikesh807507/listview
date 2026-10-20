@@ -14,49 +14,6 @@ from backend.data.market_session import evaluate_freshness, IST
 
 logger = logging.getLogger("CacheManager")
 
-OFFICIAL_INDEX_BASELINES: Dict[str, Dict[str, Any]] = {
-    "NIFTY 50": {
-        "value": 22888.95,
-        "previous_close": 22721.95,
-        "change": 167.0,
-        "change_percent": 0.73,
-        "source": "NSE Public Feed",
-        "last_verified": "19 Oct 2026, 03:31 PM IST"
-    },
-    "SENSEX": {
-        "value": 73852.9,
-        "previous_close": 73033.78,
-        "change": 819.12,
-        "change_percent": 1.12,
-        "source": "BSE Public Feed",
-        "last_verified": "19 Oct 2026, 03:32 PM IST"
-    },
-    "NIFTY BANK": {
-        "value": 55488.1,
-        "previous_close": 55481.05,
-        "change": 7.05,
-        "change_percent": 0.01,
-        "source": "NSE Public Feed",
-        "last_verified": "19 Oct 2026, 03:31 PM IST"
-    },
-    "NIFTY IT": {
-        "value": 31516.3,
-        "previous_close": 29830.1,
-        "change": 1686.2,
-        "change_percent": 5.65,
-        "source": "NSE Public Feed",
-        "last_verified": "19 Oct 2026, 03:31 PM IST"
-    },
-    "NIFTY AUTO": {
-        "value": 25591.25,
-        "previous_close": 25576.4,
-        "change": 14.85,
-        "change_percent": 0.06,
-        "source": "NSE Public Feed",
-        "last_verified": "19 Oct 2026, 03:31 PM IST"
-    }
-}
-
 class CacheManager:
     def __init__(self):
         self._memory_cache: Dict[str, Dict[str, Any]] = {}
@@ -85,15 +42,16 @@ class CacheManager:
             db.rollback()
 
     def get_last_verified_index(self, db: Session, index_name: str) -> Optional[Dict[str, Any]]:
-        """Retrieves last verified index record from in-memory cache, DB, or baseline exchange closing."""
+        """Retrieves last verified index record from in-memory cache or DB with original timestamps and provenance."""
         mem_key = f"INDEX:{index_name}"
         if mem_key in self._memory_cache:
             item = self._memory_cache[mem_key]
             if item.get("value") or item.get("price"):
                 freshness = evaluate_freshness(item["timestamp"])
+                fallback_status = "Stale Cached" if freshness["freshness"] == "Stale" else ("Market Closed" if freshness["freshness"] == "Market Closed" else "Cached")
                 return {
                     **item,
-                    "status": item.get("status", "Cached"),
+                    "status": fallback_status,
                     "freshness": freshness["freshness"],
                     "last_verified": freshness["formatted_time"],
                     "warning": freshness["warning"] or "Showing last verified cached data"
@@ -105,6 +63,7 @@ class CacheManager:
 
         if record and record.value and record.value > 0:
             freshness = evaluate_freshness(record.timestamp)
+            fallback_status = "Stale Cached" if freshness["freshness"] == "Stale" else ("Market Closed" if freshness["freshness"] == "Market Closed" else "Cached")
             return {
                 "index_name": record.index_name,
                 "price": record.value,
@@ -112,48 +71,12 @@ class CacheManager:
                 "previous_close": record.previous_close,
                 "change": record.change,
                 "change_percent": record.change_percent,
-                "timestamp": record.timestamp,
-                "source": f"{record.source} (Local DB Cache)",
-                "status": record.status or "Cached",
+                "timestamp": record.timestamp.strftime("%d %b %Y, %I:%M %p IST") if hasattr(record.timestamp, "strftime") else str(record.timestamp),
+                "source": f"{record.source} (Persisted DB Cache)",
+                "status": fallback_status,
                 "freshness": freshness["freshness"],
                 "last_verified": freshness["formatted_time"],
                 "warning": freshness["warning"] or "Showing last verified cached data"
-            }
-
-        # Baseline official exchange closing values fallback (factual closing reference from exchange)
-        if index_name in OFFICIAL_INDEX_BASELINES:
-            base = OFFICIAL_INDEX_BASELINES[index_name]
-            try:
-                rec = IndexQuote(
-                    index_name=index_name,
-                    value=base["value"],
-                    previous_close=base["previous_close"],
-                    change=base["change"],
-                    change_percent=base["change_percent"],
-                    timestamp=datetime(2026, 10, 19, 15, 30, 0),
-                    source=base["source"],
-                    status="Verified",
-                    created_at=datetime.utcnow()
-                )
-                db.add(rec)
-                db.commit()
-            except Exception as e:
-                db.rollback()
-                logger.warning(f"Error persisting baseline index {index_name}: {e}")
-
-            return {
-                "index_name": index_name,
-                "price": base["value"],
-                "value": base["value"],
-                "previous_close": base["previous_close"],
-                "change": base["change"],
-                "change_percent": base["change_percent"],
-                "timestamp": base["last_verified"],
-                "source": base["source"],
-                "status": "Market Closed",
-                "freshness": "Latest Session Close",
-                "last_verified": base["last_verified"],
-                "warning": "Showing latest verified session close"
             }
 
         return None

@@ -39,9 +39,8 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         count = db.query(Stock).count()
-        idx_count = db.query(IndexQuote).count()
-        if count == 0 or idx_count == 0:
-            logger.info("Fresh database or missing index dataset detected; initializing baseline dataset...")
+        if count == 0:
+            logger.info("Fresh database detected; initializing baseline dataset...")
             try:
                 seed_db()
             except Exception as e:
@@ -52,6 +51,16 @@ async def lifespan(app: FastAPI):
             logger.info("Initializing securities master from official exchange dataset...")
             from backend.data.securities_master import refresh_securities_master
             refresh_securities_master(db)
+
+        # Ensure index quotes cache is populated from verified public feeds
+        idx_count = db.query(IndexQuote).count()
+        if idx_count == 0:
+            logger.info("Zero index quotes in cache; executing initial verified index synchronization...")
+            from backend.sync.scheduler import sync_indices
+            try:
+                sync_indices(db)
+            except Exception as e:
+                logger.warning(f"Initial index sync error: {e}")
     finally:
         db.close()
 

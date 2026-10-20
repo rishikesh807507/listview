@@ -96,43 +96,30 @@ class ProviderManager:
             return {
                 "index_name": cached["index_name"],
                 "value": cached["value"],
+                "price": cached.get("price", cached["value"]),
                 "previous_close": cached["previous_close"],
                 "change": cached["change"],
                 "change_percent": cached["change_percent"],
                 "timestamp": cached["last_verified"],
                 "source": cached["source"],
-                "status": "Cached",
-                "freshness": cached["freshness"],
-                "warning": cached["warning"]
+                "status": cached.get("status", "Cached"),
+                "freshness": cached.get("freshness", "Cached"),
+                "warning": cached.get("warning")
             }
 
-        # 3. Tier 3: In live/cached mode, NEVER invent data
-        if self.data_mode != "demo":
-            return {
-                "index_name": index_name,
-                "value": None,
-                "previous_close": None,
-                "change": None,
-                "change_percent": None,
-                "timestamp": get_ist_now().strftime("%d %b %Y, %I:%M %p IST"),
-                "source": "None",
-                "status": "Live data unavailable",
-                "freshness": "Unavailable",
-                "warning": "Live data temporarily unavailable — no verified cache found"
-            }
-
-        # 4. Tier 4: Explicit demo mode only
+        # 3. Tier 3: In live/cached mode, strictly report Unavailable (NEVER invent numbers)
         return {
             "index_name": index_name,
-            "value": 22421.95,
-            "previous_close": 23140.50,
-            "change": -718.55,
-            "change_percent": -3.10,
-            "timestamp": "Demo Snapshot",
-            "source": "Bundled Demo Dataset",
-            "status": "Demo Mode",
-            "freshness": "Demo",
-            "warning": "Running in Demo Mode"
+            "value": None,
+            "price": None,
+            "previous_close": None,
+            "change": None,
+            "change_percent": None,
+            "timestamp": get_ist_now().strftime("%d %b %Y, %I:%M %p IST"),
+            "source": "None",
+            "status": "Unavailable",
+            "freshness": "Unavailable",
+            "warning": f"Live data temporarily unavailable — no verified cache found for {index_name}"
         }
 
     def get_equity_data(self, db: Session, symbol: str) -> Dict[str, Any]:

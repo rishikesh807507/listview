@@ -16,19 +16,24 @@ logger = logging.getLogger("StockDataProvider")
 class StockDataProvider:
     def __init__(self):
         self.headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "en-US,en;q=0.9",
         }
-        self.base_url = "https://query1.finance.yahoo.com/v8/finance/chart"
-        self._client = httpx.Client(timeout=8.0, headers=self.headers, limits=httpx.Limits(max_keepalive_connections=5, max_connections=10))
+        self.endpoints = [
+            ("https://query1.finance.yahoo.com/v8/finance/chart", "NSE Public Feed via Yahoo Finance"),
+            ("https://query2.finance.yahoo.com/v8/finance/chart", "NSE Public Feed via Yahoo Query2")
+        ]
+        self._client = httpx.Client(timeout=2.5, headers=self.headers, limits=httpx.Limits(max_keepalive_connections=5, max_connections=15))
 
     def _get_client(self) -> httpx.Client:
         if self._client.is_closed:
-            self._client = httpx.Client(timeout=8.0, headers=self.headers, limits=httpx.Limits(max_keepalive_connections=5, max_connections=10))
+            self._client = httpx.Client(timeout=2.5, headers=self.headers, limits=httpx.Limits(max_keepalive_connections=5, max_connections=15))
         return self._client
 
     def get_quote(self, symbol: str) -> Optional[Dict[str, Any]]:
         """
-        Fetches live quote for an equity symbol (e.g., RELIANCE, TCS).
+        Fetches live quote for an equity symbol (e.g., RELIANCE, TCS) with fast fallback.
         """
         meta = symbol_mapper.get_equity_meta(symbol)
         if not meta:
@@ -36,11 +41,12 @@ class StockDataProvider:
             return None
 
         yahoo_sym = meta["yahoo_symbol"]
-        url = f"{self.base_url}/{yahoo_sym}?interval=1d&range=5d"
+        clean_sym = yahoo_sym.replace("%5E", "^")
 
-        for attempt in range(2):
+        client = self._get_client()
+        for base_url, source_name in self.endpoints:
+            url = f"{base_url}/{yahoo_sym}?interval=1d&range=5d"
             try:
-                client = self._get_client()
                 resp = client.get(url)
                 if resp.status_code == 200:
                     data = resp.json()
@@ -52,29 +58,26 @@ class StockDataProvider:
                         volume = chart_meta.get("regularMarketVolume", 0.0)
                         raw_ts = chart_meta.get("regularMarketTime")
 
-                        raw_payload = {
-                            "symbol": meta["symbol"],
-                            "price": price,
-                            "previous_close": prev_close,
-                            "volume": volume,
-                            "timestamp": raw_ts,
-                            "source": "NSE Public Feed via Yahoo Finance",
-                            "exchange": meta["exchange"],
-                            "currency": "INR"
-                        }
+                        if price is not None and price > 0:
+                            raw_payload = {
+                                "symbol": meta["symbol"],
+                                "price": float(price),
+                                "previous_close": float(prev_close) if prev_close else None,
+                                "volume": float(volume) if volume else 0.0,
+                                "timestamp": raw_ts,
+                                "source": source_name,
+                                "exchange": meta["exchange"],
+                                "currency": "INR"
+                            }
 
-                        is_valid, validated_data, error = data_validator.validate_and_compute_quote(raw_payload, is_index=False)
-                        if is_valid:
-                            return validated_data
-                        else:
-                            logger.warning(f"Validation rejected {symbol}: {error}")
-                            return None
+                            is_valid, validated_data, error = data_validator.validate_and_compute_quote(raw_payload, is_index=False)
+                            if is_valid:
+                                return validated_data
+                            else:
+                                logger.warning(f"Validation rejected {symbol}: {error}")
+                                return None
             except Exception as e:
-                if attempt == 0:
-                    import time
-                    time.sleep(0.3)
-                else:
-                    logger.warning(f"Live fetch failed for equity {symbol}: {e}")
+                logger.debug(f"Live fetch failed for {symbol} on {base_url}: {e}")
 
         return None
 
